@@ -95,8 +95,12 @@ class ModelOptionsHMM:
         
         if self.A_0 is None:
             # Default to high persistence (diagonal dominant)
-            self.A_0 = np.eye(self.n_states) * 0.9 + \
-                      (1 - np.eye(self.n_states)) * (0.1 / (self.n_states - 1))
+            if self.n_states == 1:
+                # Special case for 1 state - transition matrix is just [1.0]
+                self.A_0 = np.ones((1, 1))
+            else:
+                self.A_0 = np.eye(self.n_states) * 0.9 + \
+                          (1 - np.eye(self.n_states)) * (0.1 / (self.n_states - 1))
         
         if self.alpha_A is None:
             self.alpha_A = np.ones((self.n_states, self.n_states))

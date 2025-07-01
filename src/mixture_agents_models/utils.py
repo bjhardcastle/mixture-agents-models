@@ -60,8 +60,61 @@ def cross_validate(
     Returns:
         Dictionary with cross-validation metrics
     """
+    # Handle small datasets
     if data.n_sessions < n_folds:
-        raise ValueError(f"Need at least {n_folds} sessions for {n_folds}-fold CV")
+        print(f"Warning: Only {data.n_sessions} sessions available for {n_folds}-fold CV, reducing folds")
+        n_folds = max(1, data.n_sessions)
+    
+    if data.n_trials < 10:
+        print(f"Warning: Only {data.n_trials} trials available, using simple train/test split")
+        # For very small datasets, just do a simple split
+        split_point = max(1, data.n_trials // 2)
+        
+        # Create masks for train/test split
+        train_mask = np.zeros(data.n_trials, dtype=bool)
+        train_mask[:split_point] = True
+        test_mask = ~train_mask
+        
+        results = {
+            'train_ll': np.zeros(1),
+            'test_ll': np.zeros(1),
+            'train_accuracy': np.zeros(1),
+            'test_accuracy': np.zeros(1)
+        }
+        
+        try:
+            # Import here to avoid circular imports
+            from .models import optimize, choice_accuracy, compute_log_likelihood
+            
+            train_data = _subset_data(data, train_mask)
+            test_data = _subset_data(data, test_mask)
+            
+            # Fit model on training data
+            model, agents, train_ll = optimize(
+                data=train_data,
+                model_options=model_options,
+                agent_options=agent_options,
+                verbose=False
+            )
+            
+            # Evaluate
+            train_accuracy = choice_accuracy(model, agents, train_data)
+            test_accuracy = choice_accuracy(model, agents, test_data)
+            test_ll = compute_log_likelihood(model, agents, test_data)
+            
+            results['train_ll'][0] = train_ll
+            results['test_ll'][0] = test_ll
+            results['train_accuracy'][0] = train_accuracy
+            results['test_accuracy'][0] = test_accuracy
+            
+        except Exception as e:
+            print(f"  Simple split failed: {e}")
+            results['train_ll'][0] = np.nan
+            results['test_ll'][0] = np.nan
+            results['train_accuracy'][0] = np.nan
+            results['test_accuracy'][0] = np.nan
+        
+        return results
     
     # Create session-based folds
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
@@ -121,7 +174,7 @@ def cross_validate(
 
 def model_compare(
     data: GenericData,
-    model_configs: List[Tuple[ModelOptionsHMM, AgentOptions]],
+    model_configs: List[Dict[str, Any]],
     model_names: Optional[List[str]] = None,
     cv_folds: int = 5
 ) -> pd.DataFrame:
@@ -130,7 +183,7 @@ def model_compare(
     
     Args:
         data: Behavioral data
-        model_configs: List of (model_options, agent_options) tuples
+        model_configs: List of dictionaries with 'model_options' and 'agent_options' keys
         model_names: Optional names for models
         cv_folds: Number of cross-validation folds
         
@@ -146,10 +199,13 @@ def model_compare(
     
     results = []
     
-    for i, (model_options, agent_options) in enumerate(model_configs):
+    for i, config in enumerate(model_configs):
         print(f"\nEvaluating {model_names[i]}...")
         
         try:
+            model_options = config['model_options']
+            agent_options = config['agent_options']
+            
             cv_results = cross_validate(
                 data=data,
                 model_options=model_options,
@@ -157,16 +213,38 @@ def model_compare(
                 n_folds=cv_folds
             )
             
-            # Compute summary statistics
-            mean_test_ll = np.nanmean(cv_results['test_ll'])
-            std_test_ll = np.nanstd(cv_results['test_ll'])
-            mean_test_acc = np.nanmean(cv_results['test_accuracy'])
-            std_test_acc = np.nanstd(cv_results['test_accuracy'])
+            # Compute summary statistics with safety checks
+            test_lls = cv_results['test_ll']
+            test_accs = cv_results['test_accuracy']
+            
+            # Filter out NaN and infinite values
+            valid_lls = test_lls[np.isfinite(test_lls)]
+            valid_accs = test_accs[np.isfinite(test_accs)]
+            
+            if len(valid_lls) > 0:
+                mean_test_ll = np.mean(valid_lls)
+                std_test_ll = np.std(valid_lls)
+            else:
+                mean_test_ll = np.nan
+                std_test_ll = np.nan
+                
+            if len(valid_accs) > 0:
+                mean_test_acc = np.mean(valid_accs)
+                std_test_acc = np.std(valid_accs)
+            else:
+                mean_test_acc = np.nan
+                std_test_acc = np.nan
             
             # Count parameters for complexity penalty
             n_params = _count_model_parameters(model_options, agent_options)
-            aic = -2 * mean_test_ll + 2 * n_params
-            bic = -2 * mean_test_ll + np.log(data.n_trials) * n_params
+            
+            # Handle division by zero and invalid values in AIC/BIC calculation
+            if np.isfinite(mean_test_ll) and not np.isnan(mean_test_ll) and data.n_trials > 0:
+                aic = -2 * mean_test_ll + 2 * n_params
+                bic = -2 * mean_test_ll + np.log(data.n_trials) * n_params
+            else:
+                aic = np.nan
+                bic = np.nan
             
             results.append({
                 'model': model_names[i],
@@ -218,6 +296,7 @@ def parameter_recovery(
         Dictionary with recovery results
     """
     from .models import simulate, optimize, AgentOptions
+    from .tasks import GenericData
     
     if model_options is None:
         model_options = ModelOptionsHMM()
@@ -243,12 +322,28 @@ def parameter_recovery(
         print(f"Parameter recovery simulation {sim + 1}/{n_sims}")
         
         try:
-            # Simulate data from true parameters
-            sim_data = simulate(
-                agents=true_agents,
-                model=true_model,
+            # Create simple template data for simulation
+            template_data = GenericData(
+                choices=np.zeros(n_trials, dtype=int),
+                rewards=np.zeros(n_trials, dtype=int),
                 n_trials=n_trials,
-                noise_level=noise_level
+                n_sessions=1
+            )
+            
+            # Simulate data from true parameters
+            predictions = simulate(
+                model=true_model,
+                agents=true_agents,
+                data=template_data,
+                n_reps=1
+            )
+            
+            # Create simulated data object
+            sim_data = GenericData(
+                choices=predictions['choices'][0],
+                rewards=np.random.binomial(1, 0.7, n_trials),  # Add some reward structure
+                n_trials=n_trials,
+                n_sessions=1
             )
             
             # Fit model to simulated data
@@ -260,8 +355,27 @@ def parameter_recovery(
             )
             
             # Store true and recovered parameters
-            recovery_results['true_beta'].append([agent.beta for agent in true_agents])
-            recovery_results['recovered_beta'].append([agent.beta for agent in recovered_agents])
+            # Handle different parameter names (beta, alpha, etc.)
+            true_params = []
+            recovered_params = []
+            for agent in true_agents:
+                if hasattr(agent, 'beta'):
+                    true_params.append(agent.beta)
+                elif hasattr(agent, 'alpha'):
+                    true_params.append(agent.alpha)
+                else:
+                    true_params.append(0.0)  # Default value
+            
+            for agent in recovered_agents:
+                if hasattr(agent, 'beta'):
+                    recovered_params.append(agent.beta)
+                elif hasattr(agent, 'alpha'):
+                    recovered_params.append(agent.alpha)
+                else:
+                    recovered_params.append(0.0)  # Default value
+            
+            recovery_results['true_beta'].append(true_params)
+            recovery_results['recovered_beta'].append(recovered_params)
             
             recovery_results['true_pi'].append(true_model.pi)
             recovery_results['recovered_pi'].append(recovered_model.pi)
@@ -302,16 +416,18 @@ def _count_model_parameters(model_options: ModelOptionsHMM, agent_options: Agent
     n_params = 0
     
     # Agent parameters (beta for each agent)
-    n_params += agent_options.n_agents
+    n_params += len(agent_options.agents)
     
     # Model parameters
     n_states = model_options.n_states
     
     # Initial state probabilities (n_states - 1 free parameters)
-    n_params += n_states - 1
+    if n_states > 1:
+        n_params += n_states - 1
     
     # Transition matrix (n_states * (n_states - 1) free parameters)
-    n_params += n_states * (n_states - 1)
+    if n_states > 1:
+        n_params += n_states * (n_states - 1)
     
     return n_params
 
