@@ -5,8 +5,9 @@ This module provides helper functions for data processing,
 model analysis, cross-validation, and parameter recovery.
 """
 
-from typing import List, Dict, Any, Tuple, Optional, Union
+import logging
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, log_loss
@@ -16,8 +17,10 @@ from .tasks import GenericData
 from .models import ModelHMM, ModelOptionsHMM, AgentOptions
 from .agents import Agent
 
+logger = logging.getLogger(__name__)
 
-def smooth(data: np.ndarray, window_size: int = 5) -> np.ndarray:
+
+def smooth(data: npt.NDArray[np.float64], window_size: int = 5) -> npt.NDArray[np.float64]:
     """
     Apply moving average smoothing to data.
     
@@ -28,14 +31,18 @@ def smooth(data: np.ndarray, window_size: int = 5) -> np.ndarray:
     Returns:
         Smoothed data array
     """
+    logger.debug(f"Smoothing data with window size {window_size}")
     if len(data) < window_size:
+        logger.warning(f"Data length {len(data)} is smaller than window size {window_size}")
         return data
     
     # Pad data at edges
     padded = np.pad(data, (window_size//2, window_size//2), mode='edge')
+    logger.debug(f"Padded data shape: {padded.shape}")
     
     # Apply moving average
     smoothed = np.convolve(padded, np.ones(window_size)/window_size, mode='valid')
+    logger.debug(f"Smoothed data shape: {smoothed.shape}")
     
     return smoothed
 
@@ -46,7 +53,7 @@ def cross_validate(
     agent_options: AgentOptions,
     n_folds: int = 5,
     random_state: int = 42
-) -> Dict[str, np.ndarray]:
+) -> dict[str, npt.NDArray[np.float64]]:
     """
     Perform k-fold cross-validation for model evaluation.
     
@@ -60,13 +67,15 @@ def cross_validate(
     Returns:
         Dictionary with cross-validation metrics
     """
+    logger.info(f"Starting {n_folds}-fold cross-validation on {data.n_trials} trials")
+    
     # Handle small datasets
     if data.n_sessions < n_folds:
-        print(f"Warning: Only {data.n_sessions} sessions available for {n_folds}-fold CV, reducing folds")
+        logger.warning(f"Only {data.n_sessions} sessions available for {n_folds}-fold CV, reducing folds")
         n_folds = max(1, data.n_sessions)
     
     if data.n_trials < 10:
-        print(f"Warning: Only {data.n_trials} trials available, using simple train/test split")
+        logger.warning(f"Only {data.n_trials} trials available, using simple train/test split")
         # For very small datasets, just do a simple split
         split_point = max(1, data.n_trials // 2)
         
@@ -74,6 +83,8 @@ def cross_validate(
         train_mask = np.zeros(data.n_trials, dtype=bool)
         train_mask[:split_point] = True
         test_mask = ~train_mask
+        
+        logger.debug(f"Train split: {np.sum(train_mask)} trials, Test split: {np.sum(test_mask)} trials")
         
         results = {
             'train_ll': np.zeros(1),
@@ -89,6 +100,7 @@ def cross_validate(
             train_data = _subset_data(data, train_mask)
             test_data = _subset_data(data, test_mask)
             
+            logger.debug("Fitting model on training data")
             # Fit model on training data
             model, agents, train_ll = optimize(
                 data=train_data,
@@ -97,10 +109,14 @@ def cross_validate(
                 verbose=False
             )
             
+            logger.debug("Evaluating model performance")
             # Evaluate
             train_accuracy = choice_accuracy(model, agents, train_data)
             test_accuracy = choice_accuracy(model, agents, test_data)
             test_ll = compute_log_likelihood(model, agents, test_data)
+            
+            logger.info(f"Train accuracy: {train_accuracy:.3f}, Test accuracy: {test_accuracy:.3f}")
+            logger.info(f"Train LL: {train_ll:.3f}, Test LL: {test_ll:.3f}")
             
             results['train_ll'][0] = train_ll
             results['test_ll'][0] = test_ll
@@ -108,7 +124,7 @@ def cross_validate(
             results['test_accuracy'][0] = test_accuracy
             
         except Exception as e:
-            print(f"  Simple split failed: {e}")
+            logger.error(f"Simple split failed: {e}")
             results['train_ll'][0] = np.nan
             results['test_ll'][0] = np.nan
             results['train_accuracy'][0] = np.nan
@@ -117,8 +133,10 @@ def cross_validate(
         return results
     
     # Create session-based folds
+    logger.debug(f"Creating {n_folds} session-based folds")
     kf = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
     session_indices = np.unique(data.session_indices)
+    logger.debug(f"Found {len(session_indices)} unique sessions")
     
     results = {
         'train_ll': np.zeros(n_folds),
@@ -128,11 +146,14 @@ def cross_validate(
     }
     
     for fold, (train_sessions, test_sessions) in enumerate(kf.split(session_indices)):
-        print(f"Cross-validation fold {fold + 1}/{n_folds}")
+        logger.info(f"Cross-validation fold {fold + 1}/{n_folds}")
         
         # Create train/test masks
         train_mask = np.isin(data.session_indices, session_indices[train_sessions])
         test_mask = np.isin(data.session_indices, session_indices[test_sessions])
+        
+        logger.debug(f"Train sessions: {len(train_sessions)}, Test sessions: {len(test_sessions)}")
+        logger.debug(f"Train trials: {np.sum(train_mask)}, Test trials: {np.sum(test_mask)}")
         
         # Split data
         train_data = _subset_data(data, train_mask)

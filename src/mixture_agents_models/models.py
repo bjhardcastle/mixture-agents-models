@@ -5,9 +5,10 @@ This module implements the core HMM and drift models along with
 expectation-maximization algorithms for parameter estimation.
 """
 
+import logging
 from dataclasses import dataclass, field
-from typing import Optional, List, Tuple, Dict, Any, Union
 import numpy as np
+import numpy.typing as npt
 import scipy.optimize
 import scipy.stats
 from sklearn.metrics import log_loss
@@ -15,6 +16,8 @@ from sklearn.metrics import log_loss
 from .agents import Agent
 from .tasks import GenericData
 from .types import DistributionType
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -26,12 +29,13 @@ class ModelHMM:
     in a mixture-of-agents hidden Markov model.
     """
     
-    beta: np.ndarray  # (n_agents x n_states) agent weights
-    pi: np.ndarray    # (n_states,) initial state probabilities  
-    A: np.ndarray     # (n_states x n_states) transition matrix
+    beta: npt.NDArray[np.float64]  # (n_agents x n_states) agent weights
+    pi: npt.NDArray[np.float64]    # (n_states,) initial state probabilities  
+    A: npt.NDArray[np.float64]     # (n_states x n_states) transition matrix
     
     def __post_init__(self) -> None:
         """Validate model parameters."""
+        logger.debug("Validating ModelHMM parameters")
         n_agents, n_states = self.beta.shape
         
         if len(self.pi) != n_states:
@@ -42,10 +46,14 @@ class ModelHMM:
         
         # Ensure probabilities are valid
         if not np.allclose(self.pi.sum(), 1.0):
+            logger.warning(f"Initial state probabilities do not sum to 1: {self.pi.sum()}")
             raise ValueError("pi must sum to 1")
         
         if not np.allclose(self.A.sum(axis=1), 1.0):
+            logger.warning(f"Transition matrix rows do not sum to 1: {self.A.sum(axis=1)}")
             raise ValueError("A rows must sum to 1")
+        
+        logger.debug(f"ModelHMM validated: {n_agents} agents, {n_states} states")
 
 
 @dataclass  
@@ -57,13 +65,18 @@ class ModelDrift:
     rather than switching between discrete latent states.
     """
     
-    beta: np.ndarray      # (n_agents x n_timepoints) time-varying weights
+    beta: npt.NDArray[np.float64]      # (n_agents x n_timepoints) time-varying weights
     drift_variance: float # variance of random walk drift
     
     def __post_init__(self) -> None:
         """Validate drift model parameters."""
+        logger.debug("Validating ModelDrift parameters")
         if self.drift_variance <= 0:
+            logger.error(f"Invalid drift variance: {self.drift_variance}")
             raise ValueError("drift_variance must be positive")
+        
+        n_agents, n_timepoints = self.beta.shape
+        logger.debug(f"ModelDrift validated: {n_agents} agents, {n_timepoints} timepoints")
 
 
 @dataclass
@@ -79,10 +92,10 @@ class ModelOptionsHMM:
     max_iter: int = 100
     tol: float = 1e-4
     n_starts: int = 1
-    beta_0: Optional[np.ndarray] = None
-    pi_0: Optional[np.ndarray] = None
-    A_0: Optional[np.ndarray] = None
-    alpha_A: Optional[np.ndarray] = None  # Dirichlet prior for A
+    beta_0: npt.NDArray[np.float64] | None = None
+    pi_0: npt.NDArray[np.float64] | None = None
+    A_0: npt.NDArray[np.float64] | None = None
+    alpha_A: npt.NDArray[np.float64] | None = None  # Dirichlet prior for A
     use_beta_prior: bool = True
     init_beta: bool = True
     verbose: bool = True
@@ -90,8 +103,11 @@ class ModelOptionsHMM:
     
     def __post_init__(self) -> None:
         """Set default initialization values if not provided."""
+        logger.debug(f"Initializing ModelOptionsHMM with {self.n_states} states")
+        
         if self.pi_0 is None:
             self.pi_0 = np.ones(self.n_states) / self.n_states
+            logger.debug("Created uniform initial state probabilities")
         
         if self.A_0 is None:
             # Default to high persistence (diagonal dominant)
@@ -101,9 +117,11 @@ class ModelOptionsHMM:
             else:
                 self.A_0 = np.eye(self.n_states) * 0.9 + \
                           (1 - np.eye(self.n_states)) * (0.1 / (self.n_states - 1))
+            logger.debug("Created default transition matrix with high persistence")
         
         if self.alpha_A is None:
             self.alpha_A = np.ones((self.n_states, self.n_states))
+            logger.debug("Created uniform Dirichlet priors for transition matrix")
 
 
 @dataclass
@@ -126,14 +144,14 @@ class AgentOptions:
     parameters should be fit versus held fixed.
     """
     
-    agents: List[Agent]
-    fit_symbols: Optional[List[str]] = None
-    fit_params: Optional[List[int]] = None
-    symbol_indices: Optional[List[int]] = None
-    param_indices: Optional[List[int]] = None
-    fit_indices: Optional[List[int]] = None
-    fit_scales: Optional[List[str]] = None
-    fit_priors: Optional[List[DistributionType]] = None
+    agents: list[Agent]
+    fit_symbols: list[str] | None = None
+    fit_params: list[int] | None = None
+    symbol_indices: list[int] | None = None
+    param_indices: list[int] | None = None
+    fit_indices: list[int] | None = None
+    fit_scales: list[str] | None = None
+    fit_priors: list[DistributionType] | None = None
     scale_x: bool = False
     
     def __post_init__(self) -> None:
@@ -196,7 +214,7 @@ def initialize_y(data: GenericData) -> np.ndarray:
     return y
 
 
-def initialize_x(data: GenericData, agents: List[Agent], scale_x: bool = False) -> np.ndarray:
+def initialize_x(data: GenericData, agents: list[Agent], scale_x: bool = False) -> npt.NDArray[np.float64]:
     """
     Initialize design matrix with agent Q-values.
     
@@ -236,7 +254,7 @@ def optimize(
     model_options: ModelOptionsHMM, 
     agent_options: AgentOptions,
     verbose: bool = True
-) -> Tuple[ModelHMM, List[Agent], float]:
+) -> tuple[ModelHMM, list[Agent], float]:
     """
     Fit mixture-of-agents HMM using expectation-maximization.
     
@@ -273,7 +291,7 @@ def simulate(
     agents: List[Agent], 
     data: GenericData,
     n_reps: int = 1
-) -> Dict[str, np.ndarray]:
+) -> dict[str, npt.NDArray[np.float64]]:
     """
     Simulate choice behavior using fitted model.
     
@@ -388,7 +406,7 @@ def compute_log_likelihood(
     return scipy.special.logsumexp(log_alpha[-1])
 
 
-def choice_accuracy(model: ModelHMM, agents: List[Agent], data: GenericData) -> float:
+def choice_accuracy(model: ModelHMM, agents: list[Agent], data: GenericData) -> float:
     """
     Compute choice prediction accuracy.
     

@@ -2,25 +2,27 @@
 Type definitions and protocols for mixture agents models.
 """
 
-from typing import Protocol, Union, Any
+from typing import Protocol, Union
+import logging
 import scipy.stats
 import numpy as np
+import numpy.typing as npt
 
+logger = logging.getLogger(__name__)
 
 # Type aliases for better readability
 DistributionType = Union[
     scipy.stats.rv_continuous,
-    scipy.stats.rv_discrete, 
-    scipy.stats._distn_infrastructure.rv_frozen
+    scipy.stats.rv_discrete
 ]
 
-ArrayLike = Union[np.ndarray, list, tuple]
+ArrayLike = Union[npt.NDArray, list, tuple]
 
 # Forward declarations for circular imports
 class RatData(Protocol):
     """Protocol for behavioral data objects."""
-    choices: np.ndarray
-    rewards: np.ndarray
+    choices: npt.NDArray[np.int_]
+    rewards: npt.NDArray[np.float64]
     n_trials: int
     n_sessions: int
 
@@ -29,7 +31,7 @@ class Agent(Protocol):
     """Protocol defining the Agent interface."""
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         """Initial Q values."""
         ...
     
@@ -38,20 +40,23 @@ class Agent(Protocol):
         """Prior distributions for beta parameters."""
         ...
     
-    def next_q(self, q: np.ndarray, data: RatData, t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: RatData, t: int) -> npt.NDArray[np.float64]:
         """Update Q values based on trial data."""
         ...
     
-    def get_params(self) -> dict[str, Any]:
+    def get_params(self) -> dict[str, Union[float, int, str, bool]]:
         """Get agent parameters."""
         ...
 
 
 class ModelOptions(Protocol):
     """Protocol for model configuration options."""
-    pass
+    n_states: int
+    max_iter: int
+    tol: float
 
 
 class SimOptions(Protocol):  
     """Protocol for simulation configuration options."""
-    pass
+    n_trials: int
+    n_reps: int

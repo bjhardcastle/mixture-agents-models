@@ -6,14 +6,17 @@ mixture-of-agents models with dynamic routing behavioral experiments,
 building on the existing RLmodelHPC.py framework.
 """
 
-from typing import Dict, Any, List, Optional, Tuple
+import logging
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from dataclasses import dataclass, field
 
 from .tasks import DynamicRoutingData, GenericData
 from .agents import Agent, ContextRL, MFReward, Perseveration, Bias
 from .models import ModelHMM, ModelOptionsHMM, AgentOptions, optimize
+
+logger = logging.getLogger(__name__)
 
 
 def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:

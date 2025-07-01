@@ -5,8 +5,9 @@ This module provides the core expectation-maximization algorithm
 for parameter estimation in mixture-of-agents hidden Markov models.
 """
 
-from typing import Tuple, List, Optional
+import logging
 import numpy as np
+import numpy.typing as npt
 import scipy.special
 import scipy.optimize
 from sklearn.preprocessing import StandardScaler
@@ -15,15 +16,17 @@ from .models import ModelHMM, ModelOptionsHMM, AgentOptions
 from .agents import Agent
 from .tasks import GenericData
 
+logger = logging.getLogger(__name__)
+
 
 def fit_hmm_em(
-    y: np.ndarray,
-    x: np.ndarray,
+    y: npt.NDArray[np.float64],
+    x: npt.NDArray[np.float64],
     data: GenericData,
     model_options: ModelOptionsHMM,
     agent_options: AgentOptions,
     verbose: bool = True
-) -> Tuple[ModelHMM, List[Agent], float]:
+) -> tuple[ModelHMM, list[Agent], float]:
     """
     Fit HMM using expectation-maximization algorithm.
     
@@ -38,6 +41,9 @@ def fit_hmm_em(
     Returns:
         Tuple of (fitted_model, fitted_agents, log_likelihood)
     """
+    logger.info("Starting HMM EM fitting process")
+    logger.debug(f"Data shape: {x.shape}, States: {model_options.n_states}")
+    
     n_trials, n_agents = x.shape
     n_states = model_options.n_states
     
@@ -46,10 +52,12 @@ def fit_hmm_em(
     best_agents = None
     
     for start in range(model_options.n_starts):
+        logger.info(f"EM start {start + 1}/{model_options.n_starts}")
         if verbose:
             print(f"EM start {start + 1}/{model_options.n_starts}")
         
         # Initialize parameters
+        logger.debug("Initializing HMM parameters")
         model = _initialize_hmm_parameters(model_options, n_agents)
         agents = _initialize_agents(agent_options)
         
@@ -57,6 +65,8 @@ def fit_hmm_em(
         ll_prev = -np.inf
         
         for iteration in range(model_options.max_iter):
+            logger.debug(f"EM iteration {iteration + 1}")
+            
             # E-step: compute posterior state probabilities
             log_alpha, log_beta, log_gamma, log_xi = _forward_backward(
                 y, x, model, agents
@@ -75,10 +85,12 @@ def fit_hmm_em(
             ll = scipy.special.logsumexp(log_alpha[-1])
             
             if verbose and (iteration + 1) % model_options.disp_iter == 0:
+                logger.info(f"Iteration {iteration + 1}: LL = {ll:.4f}")
                 print(f"  Iteration {iteration + 1}: LL = {ll:.4f}")
             
             # Check convergence
             if ll - ll_prev < model_options.tol:
+                logger.info(f"Converged after {iteration + 1} iterations (LL improvement: {ll - ll_prev:.6f})")
                 if verbose:
                     print(f"  Converged after {iteration + 1} iterations")
                 break
@@ -87,10 +99,12 @@ def fit_hmm_em(
         
         # Track best fit across starts
         if ll > best_ll:
+            logger.debug(f"New best log-likelihood: {ll:.4f} (previous: {best_ll:.4f})")
             best_ll = ll
             best_model = model
             best_agents = agents
     
+    logger.info(f"EM fitting completed. Final log-likelihood: {best_ll:.4f}")
     return best_model, best_agents, best_ll
 
 
@@ -123,7 +137,7 @@ def _initialize_hmm_parameters(
     return ModelHMM(beta=beta, pi=pi, A=A)
 
 
-def _initialize_agents(options: AgentOptions) -> List[Agent]:
+def _initialize_agents(options: AgentOptions) -> list[Agent]:
     """Initialize agent parameters."""
     # For now, return copy of input agents
     # In full implementation, would handle parameter initialization
@@ -131,11 +145,11 @@ def _initialize_agents(options: AgentOptions) -> List[Agent]:
 
 
 def _forward_backward(
-    y: np.ndarray,
-    x: np.ndarray, 
+    y: npt.NDArray[np.float64],
+    x: npt.NDArray[np.float64], 
     model: ModelHMM,
-    agents: List[Agent]
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    agents: list[Agent]
+) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Forward-backward algorithm for HMM inference.
     
@@ -198,9 +212,9 @@ def _forward_backward(
 
 
 def _compute_emission_log_likelihood(
-    y_t: np.ndarray, 
-    x_t: np.ndarray, 
-    beta_s: np.ndarray
+    y_t: npt.NDArray[np.float64], 
+    x_t: npt.NDArray[np.float64], 
+    beta_s: npt.NDArray[np.float64]
 ) -> float:
     """Compute emission log-likelihood for a single trial and state."""
     logit = np.dot(x_t, beta_s)
@@ -218,8 +232,8 @@ def _compute_emission_log_likelihood(
 
 def _update_hmm_parameters(
     model: ModelHMM,
-    log_gamma: np.ndarray,
-    log_xi: np.ndarray, 
+    log_gamma: npt.NDArray[np.float64],
+    log_xi: npt.NDArray[np.float64], 
     options: ModelOptionsHMM
 ) -> ModelHMM:
     """Update HMM parameters in M-step."""
@@ -249,12 +263,12 @@ def _update_hmm_parameters(
 
 
 def _update_agent_parameters(
-    agents: List[Agent],
-    y: np.ndarray, 
-    x: np.ndarray,
-    log_gamma: np.ndarray,
+    agents: list[Agent],
+    y: npt.NDArray[np.float64], 
+    x: npt.NDArray[np.float64],
+    log_gamma: npt.NDArray[np.float64],
     options: AgentOptions
-) -> List[Agent]:
+) -> list[Agent]:
     """Update agent parameters in M-step."""
     n_trials, n_states = log_gamma.shape
     n_agents = len(agents)
@@ -290,10 +304,10 @@ def _update_agent_parameters(
 
 
 def _weighted_logistic_loss(
-    beta: np.ndarray,
-    x: np.ndarray, 
-    y: np.ndarray,
-    weights: np.ndarray
+    beta: npt.NDArray[np.float64],
+    x: npt.NDArray[np.float64], 
+    y: npt.NDArray[np.float64],
+    weights: npt.NDArray[np.float64]
 ) -> float:
     """Weighted logistic regression loss function."""
     logits = np.dot(x, beta)

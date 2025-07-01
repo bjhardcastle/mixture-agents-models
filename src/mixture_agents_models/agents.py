@@ -5,13 +5,21 @@ This module defines the abstract Agent base class and implements
 common reinforcement learning agents for behavioral modeling.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Protocol, Union, Optional, Dict, Any, Tuple
+from typing import TYPE_CHECKING, Any
+
 import numpy as np
+import numpy.typing as npt
 import scipy.stats
 
 from .types import DistributionType
+
+if TYPE_CHECKING:
+    from .tasks import RatData
+
+logger = logging.getLogger(__name__)
 
 
 class Agent(ABC):
@@ -24,7 +32,7 @@ class Agent(ABC):
     
     @property
     @abstractmethod
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         """Initial Q values with length 4 for compatibility."""
         pass
     
@@ -47,7 +55,7 @@ class Agent(ABC):
         pass
     
     @abstractmethod
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """
         Update Q values based on trial data.
         
@@ -62,7 +70,7 @@ class Agent(ABC):
         pass
     
     @abstractmethod
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         """Get dictionary of agent parameters."""
         pass
     
@@ -84,7 +92,7 @@ class MBReward(Agent):
     alpha: float = field(default_factory=lambda: np.random.beta(5, 5))
     alpha_scale: int = 1
     alpha_prior: DistributionType = field(default_factory=lambda: scipy.stats.beta(1, 1))
-    _q0: np.ndarray = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
+    _q0: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
     _beta_prior: list[DistributionType] = field(
         default_factory=lambda: [scipy.stats.norm(0, 10)]
     )
@@ -92,7 +100,7 @@ class MBReward(Agent):
     _color_lite: str = "lightblue"
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         return self._q0
     
     @property 
@@ -107,13 +115,14 @@ class MBReward(Agent):
     def color_lite(self) -> str:
         return self._color_lite
     
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """Update Q values using model-based reward learning rule."""
+        logger.debug(f"MBReward updating Q values at trial {t}")
         q_new = q * (1 - self.alpha)
         q_new[data.choices[t]] += self.alpha * data.rewards[t]
         return q_new
     
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {
             "alpha": self.alpha,
             "alpha_scale": self.alpha_scale,
@@ -144,7 +153,7 @@ class MFReward(Agent):
     alpha: float = field(default_factory=lambda: np.random.beta(5, 5))
     alpha_scale: int = 1
     alpha_prior: DistributionType = field(default_factory=lambda: scipy.stats.beta(1, 1))
-    _q0: np.ndarray = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
+    _q0: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
     _beta_prior: list[DistributionType] = field(
         default_factory=lambda: [scipy.stats.norm(0, 10)]
     )
@@ -152,7 +161,7 @@ class MFReward(Agent):
     _color_lite: str = "palegreen"
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         return self._q0
     
     @property
@@ -167,13 +176,13 @@ class MFReward(Agent):
     def color_lite(self) -> str:
         return self._color_lite
     
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """Update Q values using model-free reward learning rule.""" 
         q_new = q * (1 - self.alpha)
         q_new[data.choices[t]] += self.alpha * data.rewards[t]
         return q_new
     
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {
             "alpha": self.alpha,
             "alpha_scale": self.alpha_scale, 
@@ -200,7 +209,7 @@ class Bias(Agent):
     Represents persistent tendencies independent of learning or rewards.
     """
     
-    _q0: np.ndarray = field(default_factory=lambda: np.array([0.0, 0.0, 0.0, 0.0]))
+    _q0: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([0.0, 0.0, 0.0, 0.0]))
     _beta_prior: list[DistributionType] = field(
         default_factory=lambda: [scipy.stats.norm(0, 10)]
     )
@@ -208,7 +217,7 @@ class Bias(Agent):
     _color_lite: str = "lightgray"
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         return self._q0
     
     @property
@@ -223,11 +232,11 @@ class Bias(Agent):
     def color_lite(self) -> str:
         return self._color_lite
     
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """Bias agent maintains constant values."""
         return q
     
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {}
     
     def set_params(self, **kwargs: Any) -> 'Bias':
@@ -248,7 +257,7 @@ class Perseveration(Agent):
     alpha: float = field(default_factory=lambda: np.random.beta(5, 5))
     alpha_scale: int = 1
     alpha_prior: DistributionType = field(default_factory=lambda: scipy.stats.beta(1, 1))
-    _q0: np.ndarray = field(default_factory=lambda: np.array([0.5, 0.5, 0.0, 0.0]))
+    _q0: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([0.5, 0.5, 0.0, 0.0]))
     _beta_prior: list[DistributionType] = field(
         default_factory=lambda: [scipy.stats.norm(0, 10)]
     )
@@ -256,7 +265,7 @@ class Perseveration(Agent):
     _color_lite: str = "moccasin"
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         return self._q0
     
     @property
@@ -271,13 +280,13 @@ class Perseveration(Agent):
     def color_lite(self) -> str:
         return self._color_lite
     
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """Update Q values based on choice history."""
         q_new = q * (1 - self.alpha)
         q_new[data.choices[t]] += self.alpha
         return q_new
     
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {
             "alpha": self.alpha,
             "alpha_scale": self.alpha_scale,
@@ -312,7 +321,7 @@ class ContextRL(Agent):
     alpha_reinforcement_scale: int = 1
     alpha_context_prior: DistributionType = field(default_factory=lambda: scipy.stats.beta(1, 1))
     alpha_reinforcement_prior: DistributionType = field(default_factory=lambda: scipy.stats.beta(1, 1))
-    _q0: np.ndarray = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
+    _q0: npt.NDArray[np.float64] = field(default_factory=lambda: np.array([0.5, 0.5, 0.5, 0.5]))
     _beta_prior: list[DistributionType] = field(
         default_factory=lambda: [scipy.stats.norm(0, 10)]
     )
@@ -320,7 +329,7 @@ class ContextRL(Agent):
     _color_lite: str = "lavender"
     
     @property
-    def q0(self) -> np.ndarray:
+    def q0(self) -> npt.NDArray[np.float64]:
         return self._q0
     
     @property
@@ -335,7 +344,7 @@ class ContextRL(Agent):
     def color_lite(self) -> str:
         return self._color_lite
     
-    def next_q(self, q: np.ndarray, data: 'RatData', t: int) -> np.ndarray:
+    def next_q(self, q: npt.NDArray[np.float64], data: 'RatData', t: int) -> npt.NDArray[np.float64]:
         """
         Update Q values using context-sensitive learning rule.
         
@@ -362,7 +371,7 @@ class ContextRL(Agent):
         
         return q_new
     
-    def get_params(self) -> Dict[str, Any]:
+    def get_params(self) -> dict[str, Any]:
         return {
             "alpha_context": self.alpha_context,
             "alpha_reinforcement": self.alpha_reinforcement,
