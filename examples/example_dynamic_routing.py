@@ -18,9 +18,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import mixture_agents_models as mam
 
 # Import dynamic routing utilities  
-import sys
-sys.path.append('../dynamicrouting')
-from RLmodelHPC import getSessionData
+# Add the dynamicrouting directory to Python path
+sys.path.append(str(Path(__file__).parent.parent / "dynamicrouting"))
+try:
+    from RLmodelHPC import getSessionData
+    HAVE_RL_MODEL = True
+except ImportError:
+    print("Note: RLmodelHPC not found - will use simulated data only")
+    HAVE_RL_MODEL = False
 
 
 def main():
@@ -77,11 +82,7 @@ def main():
     # Step 2: Define agents for mixture model
     print("\n2. Defining mixture agents...")
     
-    agents = mam.create_dynamic_routing_agents(
-        alpha_context=0.6,
-        alpha_reinforcement=0.5,
-        alpha_perseveration=0.3
-    )
+    agents = mam.create_dynamic_routing_agents()
     
     agent_names = [type(agent).__name__ for agent in agents]
     print(f"   Agents: {', '.join(agent_names)}")
@@ -89,23 +90,34 @@ def main():
     # Step 3: Fit 2-state HMM model
     print("\n3. Fitting 2-state mixture-of-agents HMM...")
     
-    results = mam.fit_dynamic_routing_model(
-        data=data,
-        agents=agents,
+    model_options = mam.ModelOptionsHMM(
         n_states=2,
         max_iter=50,
+        tol=1e-4,
+        n_starts=1,
         verbose=True
     )
     
-    print(f"   Log-likelihood: {results['log_likelihood']:.2f}")
-    print(f"   Accuracy: {results['accuracy']:.3f}")
+    agent_options = mam.AgentOptions(
+        agents=agents,
+        scale_x=False
+    )
+    
+    model, fitted_agents, log_likelihood = mam.optimize(
+        data=data,
+        model_options=model_options,
+        agent_options=agent_options,
+        verbose=True
+    )
+    
+    print(f"   Log-likelihood: {log_likelihood:.2f}")
+    
+    # Compute choice accuracy
+    accuracy = mam.choice_accuracy(model, fitted_agents, data)
+    print(f"   Accuracy: {accuracy:.3f}")
     
     # Step 4: Analyze results
     print("\n4. Analyzing results...")
-    
-    model = results['model']
-    fitted_agents = results['agents']
-    predictions = results['predictions']
     
     print("\n   State transition matrix:")
     print(model.A)
@@ -114,76 +126,25 @@ def main():
     print("   State 1:", model.beta[:, 0])
     print("   State 2:", model.beta[:, 1])
     
-    # Compute context sensitivity metrics
-    dr_results = mam.DynamicRoutingResults(**results)
-    context_metrics = dr_results.compute_context_sensitivity()
-    
-    print("\n   Context sensitivity:")
-    for metric, value in context_metrics.items():
-        print(f"   {metric}: {value:.3f}")
-    
-    # Step 5: Model comparison
-    print("\n5. Comparing different model configurations...")
-    
-    # Define different agent combinations to test
-    agent_sets = [
-        [mam.ContextRL(), mam.Bias()],  # Context + Bias only
-        [mam.MFReward(), mam.Perseveration(), mam.Bias()],  # Classic RL agents
-        agents,  # Full dynamic routing set
-    ]
-    
-    model_names = [
-        "Context+Bias",
-        "Classic RL",
-        "Dynamic Routing"
-    ]
-    
-    comparison_df = mam.compare_dynamic_routing_models(
-        data=data,
-        agent_sets=agent_sets,
-        model_names=model_names,
-        n_states_range=[1, 2, 3],
-        max_iter=30,
-        verbose=False
-    )
-    
-    print("\n   Model comparison results:")
-    print(comparison_df[['model_name', 'n_states', 'aic', 'bic', 'accuracy']].to_string(index=False))
-    
-    # Step 6: Plotting
-    print("\n6. Generating plots...")
+    # Step 5: Generate plots
+    print("\n5. Generating plots...")
     
     # Plot main results
-    fig1 = dr_results.plot_results()
+    fig1 = mam.plot_model(model, fitted_agents, data)
     plt.show()
-    
-    # Plot model comparison
-    fig2 = mam.plot_comparison(comparison_df, metric='aic')
-    plt.show()
-    
-    # Plot agent weights matrix
-    fig3 = mam.plot_agent_weights_matrix(model, fitted_agents)
-    plt.show()
-    
-    # Step 7: Integration with existing pipeline
-    print("\n7. Integration with dynamic routing pipeline...")
-    
-    integration_results = mam.integrate_with_rl_model_hpc(
-        mouse_id=mouse_id,
-        session_start_time=session_start_time,
-        mixture_results=dr_results
-    )
-    
-    print("   Integration successful!")
-    print(f"   Compatibility: {integration_results['compatibility']}")
     
     print("\n" + "=" * 40)
     print("Example completed successfully!")
-    print("\nNext steps:")
-    print("- Load real dynamic routing data using getSessionData()")
-    print("- Experiment with different agent combinations")
-    print("- Perform parameter recovery analysis")
-    print("- Cross-validate model performance")
+    print("\nThis example demonstrated:")
+    print("- Creating dynamic routing behavioral data")
+    print("- Fitting mixture-of-agents HMM models")
+    print("- Analyzing context-dependent behavior")
+    print("\nFor real data integration:")
+    if HAVE_RL_MODEL:
+        print("- Use getSessionData() to load actual experimental data")
+        print("- Apply convert_from_dynamic_routing() for data conversion")
+    else:
+        print("- Install RLmodelHPC.py for real data integration")
 
 
 if __name__ == "__main__":

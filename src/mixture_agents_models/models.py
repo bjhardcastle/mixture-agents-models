@@ -396,6 +396,9 @@ def choice_accuracy(model: ModelHMM, agents: List[Agent], data: GenericData) -> 
     Returns:
         Prediction accuracy (fraction correct)
     """
+    if data.n_trials == 0:
+        return 0.0
+        
     predictions = simulate(model, agents, data, n_reps=1)
     predicted_choices = predictions['choices'][0]
     
