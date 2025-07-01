@@ -3,3 +3,19 @@ Provide assistance for someone with absolutely no knowledge of the Julia program
 - Do not explain basic concepts or syntax in Python, refer to design patterns and architectural principles. 
 - Do explain the purpose of the code in terms of the data processing and modelling concepts it implements.
 - Avoid verbose explanations, focus on the solution and critical points.
+- Where possible, use a 1:1 mapping of file names and folder structure
+- Where possible use a 1:1 mapping of class names and function names, but adapt to Python naming conventions (e.g., `camelCase` to `snake_case`).
+- Write Python code with the following principles in mind:
+    - prefer writing inputs to functions as key-word arguments for clarity and safety, with the following exceptions:
+        - functions that accept one argument
+        - built-in python functions like `print()`, `len()`, etc.
+        - common library functions, like `np.searchsorted()`
+    - if using try/except, only try one thing in the try block, and only catch specific, expected exceptions. Allow everything else to fail loudly.
+    - Target Python 3.10 or later
+    - Use type hints for all public functions and classes
+    - Use pathlib for file and path handling
+    - import whole modules, not specific functions or classes
+    - Use f-strings for string formatting
+    - Prefer `dataclasses` over dicts for data structures that will be passed around
+    - Add docstrings to all public functions and classes
+- Use UV to manage Python dependencies and project metadata

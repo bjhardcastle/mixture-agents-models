@@ -1,3 +1,2 @@
-- translate the Julia codebase in this repository into Python
-- implement the examples so we can verify it works
-- translate the dynamicrouting/RLmodelHPC.py so it works with the new Python version of the codebase
+- rewrite this Julia codebase in Python, and modify it as required to work with a new behavior experiment which is modeled in dynamicrouting/RLmodelHPC.py
+- implement tests and examples
