@@ -12,9 +12,9 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .agents import Agent
-from .models import ModelHMM
-from .tasks import GenericData
+from mixture_agents_models.agents import Agent
+from mixture_agents_models.models import ModelHMM
+from mixture_agents_models.tasks import GenericData
 
 
 def plot_model(
@@ -52,7 +52,7 @@ def plot_model(
         session_data = data.get_session_data(session_idx)
 
         # Simulate to get state probabilities
-        from .models import simulate
+        from mixture_agents_models.models import simulate
 
         predictions = simulate(model, agents, session_data, n_reps=1)
 
@@ -132,10 +132,24 @@ def plot_recovery(
 
     # Plot beta recovery
     if len(recovery_results["true_beta"]) > 0:
-        true_beta = np.concatenate([b.flatten() for b in recovery_results["true_beta"]])
-        recovered_beta = np.concatenate(
-            [b.flatten() for b in recovery_results["recovered_beta"]]
-        )
+        # Convert to numpy arrays, handling both list and array formats
+        true_beta_flat = []
+        recovered_beta_flat = []
+        
+        for b in recovery_results["true_beta"]:
+            if hasattr(b, 'flatten'):
+                true_beta_flat.extend(b.flatten())
+            else:
+                true_beta_flat.extend(b)
+        
+        for b in recovery_results["recovered_beta"]:
+            if hasattr(b, 'flatten'):
+                recovered_beta_flat.extend(b.flatten())
+            else:
+                recovered_beta_flat.extend(b)
+        
+        true_beta = np.array(true_beta_flat)
+        recovered_beta = np.array(recovered_beta_flat)
 
         axes[0].scatter(true_beta, recovered_beta, alpha=0.6)
         axes[0].plot(
@@ -153,8 +167,23 @@ def plot_recovery(
 
     # Plot pi recovery
     if len(recovery_results["true_pi"]) > 0:
-        true_pi = np.concatenate([p for p in recovery_results["true_pi"]])
-        recovered_pi = np.concatenate([p for p in recovery_results["recovered_pi"]])
+        # Handle case where pi values might be lists or arrays
+        true_pi_flat = []
+        for p in recovery_results["true_pi"]:
+            if isinstance(p, (list, tuple)):
+                true_pi_flat.extend(p)
+            else:
+                true_pi_flat.extend(p.flatten())
+        
+        recovered_pi_flat = []
+        for p in recovery_results["recovered_pi"]:
+            if isinstance(p, (list, tuple)):
+                recovered_pi_flat.extend(p)
+            else:
+                recovered_pi_flat.extend(p.flatten())
+        
+        true_pi = np.array(true_pi_flat)
+        recovered_pi = np.array(recovered_pi_flat)
 
         axes[1].scatter(true_pi, recovered_pi, alpha=0.6)
         axes[1].plot([0, 1], [0, 1], "r--", alpha=0.8)

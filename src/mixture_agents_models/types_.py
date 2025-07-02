@@ -20,7 +20,7 @@ ArrayLike = npt.NDArray | list | tuple
 
 
 # Forward declarations for circular imports
-class RatData(Protocol):
+class SubjectData(Protocol):
     """Protocol for behavioral data objects."""
 
     choices: npt.NDArray[np.int_]
@@ -43,7 +43,7 @@ class Agent(Protocol):
         ...
 
     def next_q(
-        self, q: npt.NDArray[np.float64], data: RatData, t: int
+        self, q: npt.NDArray[np.float64], data: SubjectData, t: int
     ) -> npt.NDArray[np.float64]:
         """Update Q values based on trial data."""
         ...

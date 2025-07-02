@@ -10,9 +10,6 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 import mixture_agents_models as mam
 
 
@@ -25,8 +22,8 @@ def main():
     # Step 1: Simulate behavioral data
     print("1. Simulating behavioral data...")
     
-    n_trials = 500
-    n_sessions = 5
+    n_trials = 100
+    n_sessions = 3
     
     # Create realistic choice and reward sequences
     # Simulate learning with some model-based and model-free components
@@ -160,7 +157,7 @@ def main():
     )
     
     print("\n   Model comparison results:")
-    print(comparison_df[['model', 'n_params', 'aic', 'bic', 'mean_accuracy']].to_string(index=False))
+    print(comparison_df[['model', 'n_parameters', 'aic', 'bic', 'mean_accuracy']].to_string(index=False))
     
     # Step 8: Parameter recovery
     print("\n8. Parameter recovery test...")

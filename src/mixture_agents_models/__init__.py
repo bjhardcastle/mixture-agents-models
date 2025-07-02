@@ -5,13 +5,13 @@ This package provides computational models for analyzing choice behavior using
 mixture-of-agents frameworks with hidden Markov model transitions.
 """
 
-from .agents import Agent, Bias, ContextRL, MBReward, MFReward, Perseveration
-from .integration import (
+from mixture_agents_models.agents import Agent, Bias, ContextRL, MBReward, MFReward, Perseveration
+from mixture_agents_models.integration import (
     convert_from_dynamic_routing,
     create_dynamic_routing_agents,
     fit_dynamic_routing_model,
 )
-from .models import (
+from mixture_agents_models.models import (
     AgentOptions,
     ModelDrift,
     ModelHMM,
@@ -21,9 +21,9 @@ from .models import (
     optimize,
     simulate,
 )
-from .plotting import plot_comparison, plot_model, plot_recovery
-from .tasks import DynamicRoutingData, GenericData, TwoStepData, load_generic_data
-from .utils import (
+from mixture_agents_models.plotting import plot_comparison, plot_model, plot_recovery
+from mixture_agents_models.tasks import DynamicRoutingData, GenericData, TwoStepData, load_generic_data
+from mixture_agents_models.utils import (
     alpha_title,
     beta_title,
     compute_agent_strings,

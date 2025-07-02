@@ -64,8 +64,9 @@ class TestAgents(unittest.TestCase):
         """Test Bias agent."""
         agent = mam.Bias()
         
-        # Bias agent should have zero Q values
-        self.assertTrue(np.all(agent.q0 == 0))
+        # Bias agent should have initial bias values [1, -1, 0, 0]
+        expected_q0 = np.array([1.0, -1.0, 0.0, 0.0])
+        np.testing.assert_array_equal(agent.q0, expected_q0)
         
         # Q values should not change
         q = agent.q0.copy()
@@ -267,13 +268,13 @@ class TestIntegration(unittest.TestCase):
         # Create mock session data
         class MockSessionData:
             def __init__(self):
-                self.trial_response = np.random.randint(0, 2, 100)
-                self.trial_stim = ['vis1' if i % 2 == 0 else 'sound1' for i in range(100)]
-                self.auto_reward_scheduled = np.zeros(100, dtype=bool)
-                self.rewarded_stim = self.trial_stim.copy()
-                self.subject_name = "TestMouse"
-                self.start_time = "2024-01-15"
-        
+                self.trialResponse = np.random.randint(0, 2, 100)
+                self.trialStim = ['vis1' if i % 2 == 0 else 'sound1' for i in range(100)]
+                self.autoRewardScheduled = np.zeros(100, dtype=bool)
+                self.rewardedStim = self.trialStim.copy()
+                self.subjectName = "TestMouse"
+                self.startTime = "2024-01-15"
+
         session_data = MockSessionData()
         
         # Test conversion

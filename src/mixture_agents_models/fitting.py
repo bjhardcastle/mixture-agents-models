@@ -14,9 +14,9 @@ import numpy.typing as npt
 import scipy.optimize
 import scipy.special
 
-from .agents import Agent
-from .models import AgentOptions, ModelHMM, ModelOptionsHMM
-from .tasks import GenericData
+from mixture_agents_models.agents import Agent
+from mixture_agents_models.models import AgentOptions, ModelHMM, ModelOptionsHMM
+from mixture_agents_models.tasks import GenericData
 
 logger = logging.getLogger(__name__)
 

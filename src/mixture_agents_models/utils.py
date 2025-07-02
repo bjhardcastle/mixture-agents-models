@@ -16,9 +16,9 @@ import pandas as pd
 import scipy.stats
 from sklearn.model_selection import KFold
 
-from .agents import Agent
-from .models import AgentOptions, ModelHMM, ModelOptionsHMM
-from .tasks import GenericData
+from mixture_agents_models.agents import Agent
+from mixture_agents_models.models import AgentOptions, ModelHMM, ModelOptionsHMM
+from mixture_agents_models.tasks import GenericData
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ def cross_validate(
 
         try:
             # Import here to avoid circular imports
-            from .models import choice_accuracy, compute_log_likelihood, optimize
+            from mixture_agents_models.models import choice_accuracy, compute_log_likelihood, optimize
 
             train_data = _subset_data(data, train_mask)
             test_data = _subset_data(data, test_mask)
@@ -180,7 +180,7 @@ def cross_validate(
 
         try:
             # Import here to avoid circular imports
-            from .models import choice_accuracy, compute_log_likelihood, optimize
+            from mixture_agents_models.models import choice_accuracy, compute_log_likelihood, optimize
 
             # Fit model on training data
             model, agents, train_ll = optimize(
@@ -343,8 +343,8 @@ def parameter_recovery(
     Returns:
         Dictionary with recovery results
     """
-    from .models import AgentOptions, optimize, simulate
-    from .tasks import GenericData
+    from mixture_agents_models.models import AgentOptions, optimize, simulate
+    from mixture_agents_models.tasks import GenericData
 
     if model_options is None:
         model_options = ModelOptionsHMM()
@@ -551,7 +551,7 @@ def compute_model_evidence(
     Returns:
         Dictionary with evidence estimates
     """
-    from .models import optimize
+    from mixture_agents_models.models import optimize
 
     # Fit model to get MAP estimate
     model, agents, map_ll = optimize(

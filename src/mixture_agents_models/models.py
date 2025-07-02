@@ -15,9 +15,9 @@ import numpy.typing as npt
 import scipy.optimize
 import scipy.stats
 
-from .agents import Agent
-from .tasks import GenericData
-from .types import DistributionType
+from mixture_agents_models.agents import Agent
+from mixture_agents_models.tasks import GenericData
+from mixture_agents_models.types_ import DistributionType
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +284,7 @@ def optimize(
     Returns:
         Tuple of (fitted_model, fitted_agents, log_likelihood)
     """
-    from .fitting import fit_hmm_em
+    from mixture_agents_models.fitting import fit_hmm_em
 
     # Initialize data matrices
     y = initialize_y(data)

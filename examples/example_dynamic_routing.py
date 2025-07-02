@@ -40,9 +40,8 @@ def main():
     
     # Step 1: Create simulated dynamic routing data for demonstration
     print("1. Creating simulated dynamic routing data...")
-    
-    # Simulate 500 trials of dynamic routing behavior
-    n_trials = 500
+    # Simulate trials of dynamic routing behavior
+    n_trials = 100
     
     # Simulate context switches every ~50 trials
     contexts = np.repeat([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], 50)[:n_trials]

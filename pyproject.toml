@@ -15,6 +15,7 @@ dependencies = [
     "scikit-learn",
     "matplotlib",
     "dynamicroutingtask>=0.1.129",
+    "typing-extensions>=4.14.0",
 ]
 
 [project.optional-dependencies]

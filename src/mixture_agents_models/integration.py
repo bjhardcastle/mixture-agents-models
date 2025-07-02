@@ -10,20 +10,20 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Iterable
 
 import numpy as np
 import pandas as pd
 from DynamicRoutingTask.Analysis.DynamicRoutingAnalysisUtils import DynRoutData
 
-from .agents import Agent, Bias, ContextRL, MFReward, Perseveration
-from .models import AgentOptions, ModelHMM, ModelOptionsHMM, optimize
-from .tasks import DynamicRoutingData
+from mixture_agents_models.agents import Agent, Bias, ContextRL, MFReward, Perseveration
+from mixture_agents_models.models import AgentOptions, ModelHMM, ModelOptionsHMM, optimize
+from mixture_agents_models.tasks import DynamicRoutingData
 
 logger = logging.getLogger(__name__)
 
 
-def convert_from_dynamic_routing(session_data: DynRoutData) -> DynamicRoutingData:
+def _convert_single_session(session_data: DynRoutData) -> DynamicRoutingData:
     """
     Convert dynamic routing session data to mixture agents format.
 
@@ -207,7 +207,7 @@ def fit_dynamic_routing_model(
     )
 
     # Compute additional metrics
-    from .models import choice_accuracy, simulate
+    from mixture_agents_models.models import choice_accuracy, simulate
 
     accuracy = choice_accuracy(model, fitted_agents, data)
     predictions = simulate(model, fitted_agents, data, n_reps=1)
@@ -291,7 +291,7 @@ class DynamicRoutingResults:
 
     def plot_results(self, save_path: str | None = None) -> None:
         """Generate standard plots for dynamic routing results."""
-        from .plotting import plot_dynamic_routing_results
+        from mixture_agents_models.plotting import plot_dynamic_routing_results
 
         plot_dynamic_routing_results(self, save_path=save_path)
 
@@ -404,3 +404,107 @@ def integrate_with_rl_model_hpc(
     }
 
     return integration_results
+
+
+def convert_from_dynamic_routing(
+    session_data: DynRoutData | Iterable[DynRoutData]
+) -> DynamicRoutingData:
+    """
+    Convert dynamic routing session data to mixture agents format.
+
+    Handles both single sessions and multiple sessions, combining them
+    into a unified DynamicRoutingData object for cross-session analysis.
+
+    Args:
+        session_data: Single DynRoutData object or iterable of DynRoutData objects
+
+    Returns:
+        DynamicRoutingData object for mixture agents analysis
+    """
+    # Handle single session case
+    if isinstance(session_data, DynRoutData):
+        return _convert_single_session(session_data)
+
+    # Handle multiple sessions case
+    sessions = list(session_data)
+    if len(sessions) == 0:
+        raise ValueError("Empty session data provided")
+
+    if len(sessions) == 1:
+        return _convert_single_session(sessions[0])
+
+    # Convert each session individually
+    converted_sessions = [_convert_single_session(session) for session in sessions]
+
+    # Combine all sessions into a single DynamicRoutingData object
+    all_choices = np.concatenate([session.choices for session in converted_sessions])
+    all_rewards = np.concatenate([session.rewards for session in converted_sessions])
+    all_contexts = np.concatenate([session.contexts for session in converted_sessions])
+
+    # Combine other trial data arrays
+    all_trial_stim = np.concatenate([
+        session.trial_stim for session in converted_sessions
+        if len(session.trial_stim) > 0
+    ]) if any(len(session.trial_stim) > 0 for session in converted_sessions) else np.array([])
+
+    all_trial_block = np.concatenate([
+        session.trial_block for session in converted_sessions
+        if len(session.trial_block) > 0
+    ]) if any(len(session.trial_block) > 0 for session in converted_sessions) else np.array([])
+
+    all_trial_opto_label = np.concatenate([
+        session.trial_opto_label for session in converted_sessions
+        if len(session.trial_opto_label) > 0
+    ]) if any(len(session.trial_opto_label) > 0 for session in converted_sessions) else np.array([])
+
+    all_auto_reward_scheduled = np.concatenate([
+        session.auto_reward_scheduled for session in converted_sessions
+        if len(session.auto_reward_scheduled) > 0
+    ]) if any(len(session.auto_reward_scheduled) > 0 for session in converted_sessions) else np.array([])
+
+    all_rewarded_stim = np.concatenate([
+        session.rewarded_stim for session in converted_sessions
+        if len(session.rewarded_stim) > 0
+    ]) if any(len(session.rewarded_stim) > 0 for session in converted_sessions) else np.array([])
+
+    all_stim_start_times = np.concatenate([
+        session.stim_start_times for session in converted_sessions
+        if len(session.stim_start_times) > 0
+    ]) if any(len(session.stim_start_times) > 0 for session in converted_sessions) else np.array([])
+
+    # Create session indices to track which trials belong to which session
+    session_indices = np.concatenate([
+        np.full(session.n_trials, i) for i, session in enumerate(converted_sessions)
+    ])
+
+    # Collect metadata from all sessions
+    mouse_ids = [session.mouse_id for session in converted_sessions if session.mouse_id is not None]
+    if len(set(mouse_ids)) != 1:
+        logger.warning('Sessions to be combined are from different subjects - the id and start time on the resulting object will only reflect the first session.')
+    session_start_times = [session.session_start_time for session in converted_sessions if session.session_start_time is not None]
+
+    combined_metadata = {
+        "source": "dynamic_routing",
+        "converted": True,
+        "n_source_sessions": len(sessions),
+        "mouse_ids": mouse_ids,
+        "session_start_times": session_start_times,
+    }
+
+    return DynamicRoutingData(
+        choices=all_choices,
+        rewards=all_rewards,
+        n_trials=len(all_choices),
+        n_sessions=len(sessions),
+        session_indices=session_indices,
+        contexts=all_contexts,
+        trial_stim=all_trial_stim,
+        trial_block=all_trial_block,
+        trial_opto_label=all_trial_opto_label,
+        auto_reward_scheduled=all_auto_reward_scheduled,
+        rewarded_stim=all_rewarded_stim,
+        stim_start_times=all_stim_start_times,
+        mouse_id=mouse_ids[0] if mouse_ids else None,
+        session_start_time=session_start_times[0] if session_start_times else None,
+        metadata=combined_metadata,
+    )
