@@ -220,8 +220,8 @@ def evalModel(params,*args):
     sampleWeight = None
     if clust is not None:
         trials = np.concatenate(trainDataTrialCluster) == clust
-    elif 'optoLabel' in paramsDict and paramsDict['optoLabel'] is not None:
-        trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+paramsDict['optoLabel']) for obj in trainData])
+    elif 'optoLabel' in paramsDict and paramsdict['optoLabel'] is not None:
+        trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+paramsdict['optoLabel']) for obj in trainData])
     else:
         trials = np.ones(response.size,dtype=bool)
         # sampleWeight = []
@@ -265,11 +265,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
 
     paramsDict = {'optoLabel': None}
     if modelType in ('BasicRL','ContextRL'):
-        paramsDict['initReinforcement'] = True
+        paramsdict['initReinforcement'] = True
     else:
         for paramsOption in ('stateSpace','contextPerseveration','initReinforcement','initPerseveration','scalarError'):
             if paramsOption in modelType:
-                paramsDict[paramsOption] = True
+                paramsdict[paramsOption] = True
 
     if trainingPhase == 'clusters':
         clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()

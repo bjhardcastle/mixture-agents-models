@@ -25,7 +25,7 @@ def main():
     # Step 1: Simulate behavioral data
     print("1. Simulating behavioral data...")
     
-    n_trials = 1000
+    n_trials = 500
     n_sessions = 5
     
     # Create realistic choice and reward sequences
@@ -160,7 +160,7 @@ def main():
     )
     
     print("\n   Model comparison results:")
-    print(comparison_df[['model', 'n_states', 'aic', 'bic', 'accuracy']].to_string(index=False))
+    print(comparison_df[['model', 'n_params', 'aic', 'bic', 'mean_accuracy']].to_string(index=False))
     
     # Step 8: Parameter recovery
     print("\n8. Parameter recovery test...")

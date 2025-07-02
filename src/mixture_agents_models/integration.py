@@ -6,15 +6,18 @@ mixture-of-agents models with dynamic routing behavioral experiments,
 building on the existing RLmodelHPC.py framework.
 """
 
-import logging
-import numpy as np
-import numpy.typing as npt
-import pandas as pd
-from dataclasses import dataclass, field
+from __future__ import annotations
 
-from .tasks import DynamicRoutingData, GenericData
-from .agents import Agent, ContextRL, MFReward, Perseveration, Bias
-from .models import ModelHMM, ModelOptionsHMM, AgentOptions, optimize
+import logging
+from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from .agents import Agent, Bias, ContextRL, MFReward, Perseveration
+from .models import AgentOptions, ModelHMM, ModelOptionsHMM, optimize
+from .tasks import DynamicRoutingData
 
 logger = logging.getLogger(__name__)
 
@@ -22,49 +25,75 @@ logger = logging.getLogger(__name__)
 def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
     """
     Convert dynamic routing session data to mixture agents format.
-    
+
     Args:
         session_data: Session data object from RLmodelHPC.py
-        
+
     Returns:
         DynamicRoutingData object for mixture agents analysis
     """
     # Extract core behavioral data
     choices = np.array(session_data.trial_response, dtype=int)
-    
+
     # Compute rewards based on choice and rewarded stimulus
     rewards = np.zeros_like(choices, dtype=float)
     for t in range(len(choices)):
-        if hasattr(session_data, 'auto_reward_scheduled'):
+        if hasattr(session_data, "auto_reward_scheduled"):
             if session_data.auto_reward_scheduled[t]:
                 rewards[t] = 1.0
-        
+
         # Check if choice matches rewarded stimulus
-        if (choices[t] == 1 and 
-            hasattr(session_data, 'rewarded_stim') and 
-            hasattr(session_data, 'trial_stim')):
+        if (
+            choices[t] == 1
+            and hasattr(session_data, "rewarded_stim")
+            and hasattr(session_data, "trial_stim")
+        ):
             stim = session_data.trial_stim[t]
             if stim == session_data.rewarded_stim[t]:
                 rewards[t] = 1.0
-    
+
     # Extract trial context information
     contexts = np.zeros(len(choices), dtype=int)
-    if hasattr(session_data, 'trial_stim'):
+    if hasattr(session_data, "trial_stim"):
         # Convert stimulus names to context indices
         for t, stim in enumerate(session_data.trial_stim):
-            if 'vis' in str(stim):
+            if "vis" in str(stim):
                 contexts[t] = 0  # Visual context
-            elif 'sound' in str(stim):
+            elif "sound" in str(stim):
                 contexts[t] = 1  # Auditory context
-    
+
     # Extract other trial information
-    trial_stim = np.array(session_data.trial_stim) if hasattr(session_data, 'trial_stim') else np.array([])
-    trial_block = np.array(session_data.trial_block) if hasattr(session_data, 'trial_block') else np.array([])
-    trial_opto_label = np.array(session_data.trial_opto_label) if hasattr(session_data, 'trial_opto_label') else np.array([])
-    auto_reward_scheduled = np.array(session_data.auto_reward_scheduled) if hasattr(session_data, 'auto_reward_scheduled') else np.array([])
-    rewarded_stim = np.array(session_data.rewarded_stim) if hasattr(session_data, 'rewarded_stim') else np.array([])
-    stim_start_times = np.array(session_data.stim_start_times) if hasattr(session_data, 'stim_start_times') else np.array([])
-    
+    trial_stim = (
+        np.array(session_data.trial_stim)
+        if hasattr(session_data, "trial_stim")
+        else np.array([])
+    )
+    trial_block = (
+        np.array(session_data.trial_block)
+        if hasattr(session_data, "trial_block")
+        else np.array([])
+    )
+    trial_opto_label = (
+        np.array(session_data.trial_opto_label)
+        if hasattr(session_data, "trial_opto_label")
+        else np.array([])
+    )
+    auto_reward_scheduled = (
+        np.array(session_data.auto_reward_scheduled)
+        if hasattr(session_data, "auto_reward_scheduled")
+        else np.array([])
+    )
+    rewarded_stim = (
+        np.array(session_data.rewarded_stim)
+        if hasattr(session_data, "rewarded_stim")
+        else np.array([])
+    )
+    stim_start_times = (
+        np.array(session_data.stim_start_times)
+        if hasattr(session_data, "stim_start_times")
+        else np.array([])
+    )
+
     return DynamicRoutingData(
         choices=choices,
         rewards=rewards,
@@ -77,9 +106,9 @@ def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
         auto_reward_scheduled=auto_reward_scheduled,
         rewarded_stim=rewarded_stim,
         stim_start_times=stim_start_times,
-        mouse_id=getattr(session_data, 'subject_name', None),
-        session_start_time=getattr(session_data, 'start_time', None),
-        metadata={'source': 'dynamic_routing', 'converted': True}
+        mouse_id=getattr(session_data, "subject_name", None),
+        session_start_time=getattr(session_data, "start_time", None),
+        metadata={"source": "dynamic_routing", "converted": True},
     )
 
 
@@ -89,11 +118,11 @@ def create_dynamic_routing_agents(
     alpha_context: float = 0.5,
     alpha_reinforcement: float = 0.4,
     alpha_perseveration: float = 0.3,
-    bias_action: float = 0.0
-) -> List[Agent]:
+    bias_action: float = 0.0,
+) -> list[Agent]:
     """
     Create standard agent set for dynamic routing experiments.
-    
+
     Args:
         vis_confidence: Visual stimulus confidence parameter
         aud_confidence: Auditory stimulus confidence parameter
@@ -101,109 +130,96 @@ def create_dynamic_routing_agents(
         alpha_reinforcement: Reinforcement learning rate
         alpha_perseveration: Perseveration learning rate
         bias_action: Action bias parameter
-        
+
     Returns:
         List of agents configured for dynamic routing
     """
     agents = [
-        ContextRL(
-            alpha_context=alpha_context,
-            alpha_reinforcement=alpha_reinforcement
-        ),
+        ContextRL(alpha_context=alpha_context, alpha_reinforcement=alpha_reinforcement),
         MFReward(alpha=alpha_reinforcement),
         Perseveration(alpha=alpha_perseveration),
-        Bias()
+        Bias(),
     ]
-    
+
     return agents
 
 
 def create_dynamic_routing_agents() -> list[Agent]:
     """
     Create a default set of agents suitable for dynamic routing experiments.
-    
-    This provides a standard agent configuration that parallels the 
+
+    This provides a standard agent configuration that parallels the
     reinforcement learning components in the original dynamic routing model.
-    
+
     Returns:
         List of Agent objects configured for dynamic routing analysis
     """
     agents = [
-        ContextRL(
-            alpha_context=0.3,
-            alpha_reinforcement=0.2
-        ),
-        MFReward(
-            alpha=0.4
-        ),
-        Perseveration(
-            alpha=0.2
-        ),
-        Bias()
+        ContextRL(alpha_context=0.3, alpha_reinforcement=0.2),
+        MFReward(alpha=0.4),
+        Perseveration(alpha=0.2),
+        Bias(),
     ]
-    
+
     return agents
 
 
 def fit_dynamic_routing_model(
     data: DynamicRoutingData,
-    agents: Optional[List[Agent]] = None,
+    agents: list[Agent] | None = None,
     n_states: int = 2,
-    **kwargs: Any
-) -> Dict[str, Any]:
+    **kwargs: Any,
+) -> dict[str, Any]:
     """
     Fit mixture-of-agents model to dynamic routing data.
-    
+
     Args:
         data: Dynamic routing behavioral data
         agents: List of agents (uses default if None)
         n_states: Number of hidden states
         **kwargs: Additional arguments for model fitting
-        
+
     Returns:
         Dictionary with fitting results
     """
     if agents is None:
         agents = create_dynamic_routing_agents()
-    
+
     # Configure model options
     model_options = ModelOptionsHMM(
         n_states=n_states,
-        max_iter=kwargs.get('max_iter', 100),
-        tol=kwargs.get('tol', 1e-4),
-        n_starts=kwargs.get('n_starts', 1),
-        verbose=kwargs.get('verbose', True)
+        max_iter=kwargs.get("max_iter", 100),
+        tol=kwargs.get("tol", 1e-4),
+        n_starts=kwargs.get("n_starts", 1),
+        verbose=kwargs.get("verbose", True),
     )
-    
+
     # Configure agent options
-    agent_options = AgentOptions(
-        agents=agents,
-        scale_x=kwargs.get('scale_x', False)
-    )
-    
+    agent_options = AgentOptions(agents=agents, scale_x=kwargs.get("scale_x", False))
+
     # Fit model
     model, fitted_agents, log_likelihood = optimize(
         data=data,
         model_options=model_options,
         agent_options=agent_options,
-        verbose=kwargs.get('verbose', True)
+        verbose=kwargs.get("verbose", True),
     )
-    
+
     # Compute additional metrics
     from .models import choice_accuracy, simulate
-    
+
     accuracy = choice_accuracy(model, fitted_agents, data)
     predictions = simulate(model, fitted_agents, data, n_reps=1)
-    
+
     return {
-        'model': model,
-        'agents': fitted_agents,
-        'log_likelihood': log_likelihood,
-        'accuracy': accuracy,
-        'predictions': predictions,
-        'data': data,
-        'model_options': model_options,
-        'agent_options': agent_options
+        "model": model,
+        "agents": fitted_agents,
+        "log_likelihood": log_likelihood,
+        "accuracy": accuracy,
+        "predictions": predictions,
+        "data": data,
+        "model_options": model_options,
+        "agent_options": agent_options,
     }
 
 
@@ -211,175 +227,179 @@ def fit_dynamic_routing_model(
 class DynamicRoutingResults:
     """
     Container for dynamic routing analysis results.
-    
+
     Provides structured access to model fitting results and
     comparison metrics for dynamic routing experiments.
     """
-    
+
     model: ModelHMM
-    agents: List[Agent]
+    agents: list[Agent]
     log_likelihood: float
     accuracy: float
-    predictions: Dict[str, np.ndarray]
+    predictions: dict[str, np.ndarray]
     data: DynamicRoutingData
     model_options: ModelOptionsHMM
     agent_options: AgentOptions
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     def get_state_probabilities(self) -> np.ndarray:
         """Get posterior state probabilities over time."""
-        return self.predictions.get('state_probs', np.array([]))
-    
-    def get_agent_contributions(self) -> Dict[str, np.ndarray]:
+        return self.predictions.get("state_probs", np.array([]))
+
+    def get_agent_contributions(self) -> dict[str, np.ndarray]:
         """Get agent contribution weights over time."""
         state_probs = self.get_state_probabilities()
         if len(state_probs) == 0:
             return {}
-        
+
         # Compute expected agent weights across states
         n_trials = state_probs.shape[1]
         n_agents = self.model.beta.shape[0]
-        
+
         agent_weights = np.zeros((n_trials, n_agents))
         for t in range(n_trials):
             agent_weights[t] = np.dot(self.model.beta, state_probs[0, t])
-        
+
         agent_names = [type(agent).__name__ for agent in self.agents]
         return {name: agent_weights[:, i] for i, name in enumerate(agent_names)}
-    
-    def compute_context_sensitivity(self) -> Dict[str, float]:
+
+    def compute_context_sensitivity(self) -> dict[str, float]:
         """Compute metrics of context sensitivity."""
-        if not hasattr(self.data, 'contexts') or self.data.contexts is None:
+        if not hasattr(self.data, "contexts") or self.data.contexts is None:
             return {}
-        
+
         contexts = self.data.contexts
         choices = self.data.choices
-        
+
         # Compute choice probability by context
         vis_trials = contexts == 0
         aud_trials = contexts == 1
-        
+
         metrics = {}
         if np.sum(vis_trials) > 0:
-            metrics['visual_choice_rate'] = np.mean(choices[vis_trials])
+            metrics["visual_choice_rate"] = np.mean(choices[vis_trials])
         if np.sum(aud_trials) > 0:
-            metrics['auditory_choice_rate'] = np.mean(choices[aud_trials])
-        
-        if 'visual_choice_rate' in metrics and 'auditory_choice_rate' in metrics:
-            metrics['context_bias'] = metrics['visual_choice_rate'] - metrics['auditory_choice_rate']
-        
+            metrics["auditory_choice_rate"] = np.mean(choices[aud_trials])
+
+        if "visual_choice_rate" in metrics and "auditory_choice_rate" in metrics:
+            metrics["context_bias"] = (
+                metrics["visual_choice_rate"] - metrics["auditory_choice_rate"]
+            )
+
         return metrics
-    
-    def plot_results(self, save_path: Optional[str] = None) -> None:
+
+    def plot_results(self, save_path: str | None = None) -> None:
         """Generate standard plots for dynamic routing results."""
         from .plotting import plot_dynamic_routing_results
+
         plot_dynamic_routing_results(self, save_path=save_path)
 
 
 def compare_dynamic_routing_models(
     data: DynamicRoutingData,
-    agent_sets: List[List[Agent]],
-    model_names: Optional[List[str]] = None,
-    n_states_range: List[int] = [1, 2, 3],
-    **kwargs: Any
+    agent_sets: list[list[Agent]],
+    model_names: list[str] | None = None,
+    n_states_range: list[int] = [1, 2, 3],
+    **kwargs: Any,
 ) -> pd.DataFrame:
     """
     Compare different agent combinations and state numbers.
-    
+
     Args:
         data: Dynamic routing behavioral data
         agent_sets: List of agent combinations to compare
         model_names: Names for each agent set
         n_states_range: Range of state numbers to test
         **kwargs: Additional fitting arguments
-        
+
     Returns:
         DataFrame with model comparison results
     """
     if model_names is None:
         model_names = [f"Model_{i+1}" for i in range(len(agent_sets))]
-    
+
     results = []
-    
+
     for i, agents in enumerate(agent_sets):
         for n_states in n_states_range:
             print(f"Fitting {model_names[i]} with {n_states} states...")
-            
+
             try:
                 result = fit_dynamic_routing_model(
-                    data=data,
-                    agents=agents,
-                    n_states=n_states,
-                    verbose=False,
-                    **kwargs
+                    data=data, agents=agents, n_states=n_states, verbose=False, **kwargs
                 )
-                
-                results.append({
-                    'model_name': model_names[i],
-                    'n_states': n_states,
-                    'n_agents': len(agents),
-                    'log_likelihood': result['log_likelihood'],
-                    'accuracy': result['accuracy'],
-                    'aic': -2 * result['log_likelihood'] + 2 * (len(agents) * n_states + n_states + n_states**2),
-                    'bic': -2 * result['log_likelihood'] + np.log(data.n_trials) * (len(agents) * n_states + n_states + n_states**2),
-                    'agents': [type(agent).__name__ for agent in agents]
-                })
-                
+
+                results.append(
+                    {
+                        "model_name": model_names[i],
+                        "n_states": n_states,
+                        "n_agents": len(agents),
+                        "log_likelihood": result["log_likelihood"],
+                        "accuracy": result["accuracy"],
+                        "aic": -2 * result["log_likelihood"]
+                        + 2 * (len(agents) * n_states + n_states + n_states**2),
+                        "bic": -2 * result["log_likelihood"]
+                        + np.log(data.n_trials)
+                        * (len(agents) * n_states + n_states + n_states**2),
+                        "agents": [type(agent).__name__ for agent in agents],
+                    }
+                )
+
             except Exception as e:
                 print(f"  Failed: {e}")
-                results.append({
-                    'model_name': model_names[i],
-                    'n_states': n_states,
-                    'n_agents': len(agents),
-                    'log_likelihood': np.nan,
-                    'accuracy': np.nan,
-                    'aic': np.nan,
-                    'bic': np.nan,
-                    'agents': [type(agent).__name__ for agent in agents],
-                    'error': str(e)
-                })
-    
+                results.append(
+                    {
+                        "model_name": model_names[i],
+                        "n_states": n_states,
+                        "n_agents": len(agents),
+                        "log_likelihood": np.nan,
+                        "accuracy": np.nan,
+                        "aic": np.nan,
+                        "bic": np.nan,
+                        "agents": [type(agent).__name__ for agent in agents],
+                        "error": str(e),
+                    }
+                )
+
     return pd.DataFrame(results)
 
 
 def integrate_with_rl_model_hpc(
-    mouse_id: int,
-    session_start_time: str,
-    mixture_results: DynamicRoutingResults
-) -> Dict[str, Any]:
+    mouse_id: int, session_start_time: str, mixture_results: DynamicRoutingResults
+) -> dict[str, Any]:
     """
     Integrate mixture agents results back with RLmodelHPC framework.
-    
+
     Args:
         mouse_id: Mouse identifier
         session_start_time: Session start time
         mixture_results: Results from mixture agents fitting
-        
+
     Returns:
         Dictionary with integrated analysis results
     """
     # This would integrate with the existing dynamic routing pipeline
     # For now, return structured results that can be used downstream
-    
+
     integration_results = {
-        'mouse_id': mouse_id,
-        'session_start_time': session_start_time,
-        'mixture_model': {
-            'log_likelihood': mixture_results.log_likelihood,
-            'accuracy': mixture_results.accuracy,
-            'n_states': len(mixture_results.model.pi),
-            'agent_weights': mixture_results.model.beta,
-            'state_transitions': mixture_results.model.A,
-            'initial_state_probs': mixture_results.model.pi
+        "mouse_id": mouse_id,
+        "session_start_time": session_start_time,
+        "mixture_model": {
+            "log_likelihood": mixture_results.log_likelihood,
+            "accuracy": mixture_results.accuracy,
+            "n_states": len(mixture_results.model.pi),
+            "agent_weights": mixture_results.model.beta,
+            "state_transitions": mixture_results.model.A,
+            "initial_state_probs": mixture_results.model.pi,
         },
-        'agent_contributions': mixture_results.get_agent_contributions(),
-        'context_sensitivity': mixture_results.compute_context_sensitivity(),
-        'predictions': mixture_results.predictions,
-        'compatibility': {
-            'rl_model_hpc': True,
-            'conversion_successful': True,
-            'data_format': 'dynamic_routing'
-        }
+        "agent_contributions": mixture_results.get_agent_contributions(),
+        "context_sensitivity": mixture_results.compute_context_sensitivity(),
+        "predictions": mixture_results.predictions,
+        "compatibility": {
+            "rl_model_hpc": True,
+            "conversion_successful": True,
+            "data_format": "dynamic_routing",
+        },
     }
-    
+
     return integration_results

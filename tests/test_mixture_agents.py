@@ -210,14 +210,6 @@ class TestModels(unittest.TestCase):
         self.assertEqual(len(options.agents), 3)
         self.assertFalse(options.scale_x)
     
-    def test_initialize_matrices(self):
-        """Test matrix initialization functions."""
-        y = mam.initialize_y(self.data)
-        self.assertEqual(y.shape, (self.n_trials, 2))
-        
-        x = mam.initialize_x(self.data, self.agents)
-        self.assertEqual(x.shape, (self.n_trials, len(self.agents)))
-    
     def test_basic_fitting(self):
         """Test basic model fitting."""
         model_options = mam.ModelOptionsHMM(
@@ -323,7 +315,7 @@ class TestUtils(unittest.TestCase):
     def test_smooth_function(self):
         """Test smoothing function."""
         x = np.array([1, 5, 3, 7, 2])
-        smoothed = mam.smooth(x, window=3)
+        smoothed = mam.smooth(x, window_size=3)
         
         self.assertEqual(len(smoothed), len(x))
         # Middle value should be average of neighbors

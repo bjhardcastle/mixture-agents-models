@@ -22,10 +22,10 @@ import mixture_agents_models as mam
 sys.path.append(str(Path(__file__).parent.parent / "dynamicrouting"))
 try:
     from RLmodelHPC import getSessionData
-    HAVE_RL_MODEL = True
+    DATA_AVAILABLE = True
 except ImportError:
     print("Note: RLmodelHPC not found - will use simulated data only")
-    HAVE_RL_MODEL = False
+    DATA_AVAILABLE = False
 
 
 def main():
@@ -140,7 +140,7 @@ def main():
     print("- Fitting mixture-of-agents HMM models")
     print("- Analyzing context-dependent behavior")
     print("\nFor real data integration:")
-    if HAVE_RL_MODEL:
+    if DATA_AVAILABLE:
         print("- Use getSessionData() to load actual experimental data")
         print("- Apply convert_from_dynamic_routing() for data conversion")
     else:

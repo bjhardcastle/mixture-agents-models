@@ -1,85 +1,101 @@
-# MixtureAgentsModels
-Fit a Mixture-of-Agents Hidden Markov Model (MoA-HMM) described in the preprint <a href=https://www.biorxiv.org/content/10.1101/2024.02.28.582617v1>Dynamic reinforcement learning reveals time-dependent shifts in strategy during reward learning.</a>
+# Mixture Agents Models - Python
 
-Documentation is a work in progress
+A Python implementation of Mixture-of-Agents Hidden Markov Models (MoA-HMM) for behavioral data analysis, translated from the original Julia codebase and integrated with dynamic routing experiments.
 
-For questions, email sjvenditto@gmail.com
+## Overview
+
+This package implements computational models for analyzing choice behavior using mixture-of-agents frameworks. The core innovation is decomposing complex decision-making into interpretable cognitive strategies (agents) that can transition between latent behavioral states.
+
+## Key Components
+
+- **Agents**: Individual cognitive strategies (model-based, model-free, bias, perseveration, etc.)
+- **HMM Framework**: Hidden Markov models for state transitions between agent mixtures
+- **Dynamic Routing Integration**: Specialized components for multi-modal decision tasks
+- **Fitting & Analysis**: Parameter estimation, cross-validation, and model comparison tools
 
 ## Installation
-### Option 1: Clone and setup project folder (i.e. julia environment)
-From the terminal/command line, clone the repository in the current directory with:
-```
-git clone https://github.com/Brody-Lab/MixtureAgentsModels/
-```
-Or <a href=https://github.com/Brody-Lab/MixtureAgentsModels/archive/refs/heads/main.zip>download ZIP</a> and extract in desired directory.
 
-After cloning, also from the terminal/command line, `cd` into the `MixtureAgentsModels` directory and start julia by specifying the current folder as the project location:
-```
-julia --project=.
-```
-or, if outside of the `MixtureAgentsModels` directory,
-```
-julia --project=PATH/TO/YOUR/MixtureAgentsModels
+```bash
+# Using UV (recommended)
+uv pip install -e .
+
+# Or using pip
+pip install -e .
 ```
 
-Once in julia, enter the package manager by pressing `]` and type the following command to install the package in the project folder:
-```julia
-pkg > instantiate
-```
-or, without using the package manager:
-```julia
-julia > using Pkg
-julia > Pkg.instantiate()
-```
-This will only install the package within the project folder, so to use the package via `using MixtureAgentsModels`, you must first start julia by specifying the project folder as shown above. If you cloned the repository, using the command `git pull` will update the package.
+## Quick Start
 
-### Option 2: Install as global package
-To install the package globally, start julia and enter the package manager by pressing `]`. To install, enter the following command:
-```julia
-pkg > add https://github.com/Brody-Lab/MixtureAgentsModels/
-```
-or, without using the package manager:
-```julia
-julia > using Pkg
-julia > Pkg.add(PackageSpec(url="https://github.com/Brody-Lab/MixtureAgentsModels/"))
-```
-To update the package, enter the package manager using `]` and type the command 
-```julia
-pkg > update
-```
+```python
+import mixture_agents_models as mam
+from dynamicrouting.rl_model_hpc import load_session_data
 
-## Getting started
-### Fitting the model
-See the `example_fit_HMM.jl` script in the <a href=https://github.com/Brody-Lab/MixtureAgentsModels/tree/main/examples>examples</a> directory for example model MoA-HMM fits to the two-step task and command descriptions. 
-> NOTE: `example_fit_drift.jl` uses an experimental model that combines a MoA with psytrack (https://github.com/nicholas-roy/psytrack) and should not be used in a serious capacity.
+# Load behavioral data
+data = mam.load_generic_data("path/to/data.csv")
 
-### Loading your own task via `GenericData`
-The task data struct `GenericData` contained in `generic_task.jl` in the <a href=https://github.com/Brody-Lab/MixtureAgentsModels/tree/main/src/tasks>tasks</a> directory contains the minimum features necessary to work with model-free agents. The example script `example_load_data.jl` points to two example files (a `.csv` and `.mat`) that can be used as skeletons for loading in your own data, as well as listing compatible agents with the GenericData struct. Additional fields can be added for compatibility with other agents. You may want to fork the repository first if you want to easily commit changes.
+# Define agents for mixture model
+agents = [
+    mam.MBReward(alpha=0.6),
+    mam.MFReward(alpha=0.4), 
+    mam.Bias()
+]
 
-### Adding a new agent or task
-Documentation for adding your own task or agent/agents is a work in progress. You may want to fork the repository first if you want to easily commit changes.
+# Configure HMM with 2 hidden states
+model_options = mam.ModelOptionsHMM(n_states=2, max_iter=100)
+agent_options = mam.AgentOptions(agents=agents)
 
-To add your own agent, see the documentation of `EXAMPLE_agent.jl` in the <a href=https://github.com/Brody-Lab/MixtureAgentsModels/tree/main/src/agents>agents</a> directory for requisite struct fields and functions. Save your new agent as its own julia script in the same `agents` directory.
+# Fit model
+model, fitted_agents, log_likelihood = mam.optimize(
+    data=data,
+    model_options=model_options, 
+    agent_options=agent_options
+)
 
-To add your own task, see the documentation of `generic_task.jl` in the <a href=https://github.com/Brody-Lab/MixtureAgentsModels/tree/main/src/tasks>tasks</a> directory for requisite struct fields and loading examples. Save your new task as its own julia script in the same `tasks` directory.
-
-Any agent or task needs to be exported and its file added to the module definition script `MixtureAgentsModels.jl`. To export a new agent or task, add a line near the existing agents and/or tasks.
-```julia
-export EXAMPLEAgent # for your agent struct
-export EXAMPLEData # for your task struct
+# Generate predictions and analyze results
+predictions = mam.simulate(model, fitted_agents, data)
+mam.plot_model(model, fitted_agents, data)
 ```
 
-If you have a custom loading function for your task struct, similarly export that function:
-```julia
-export load_example_task # or however you named the function
+## Integration with Dynamic Routing
+
+The package includes specialized integration with dynamic routing experiments:
+
+```python
+from dynamicrouting.rl_model_hpc import get_session_data
+import mixture_agents_models as mam
+
+# Load dynamic routing session
+mouse_id = 12345
+session_data = get_session_data(mouse_id, "2024-01-15")
+
+# Convert to mixture agents format
+data = mam.convert_from_dynamic_routing(session_data)
+
+# Define context-sensitive agents
+agents = [
+    mam.ContextRL(alpha_context=0.7),
+    mam.MFReward(alpha=0.5),
+    mam.Perseveration(alpha=0.3)
+]
+
+# Fit and analyze
+results = mam.fit_dynamic_routing_model(data, agents)
 ```
 
-Finally, add the scripts containing the code for your new agents and/or tasks near the end of module script near existing agents and tasks:
-```julia
-include("agents/EXAMPLE_agent.jl")
-include("tasks/EXAMPLE_task.jl")
+## Architecture
+
+The package follows these design principles:
+
+- **Dataclasses**: Structured data containers for agents, models, and options
+- **Type Safety**: Full type hints throughout the codebase  
+- **Modular Design**: Composable agents and model components
+- **Integration Ready**: Compatible with existing dynamic routing analysis pipeline
+
+## Testing
+
+```bash
+# Run tests
+pytest tests/
+
+# With coverage
+pytest --cov=mixture_agents_models tests/
 ```
-
-
-
-

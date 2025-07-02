@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 # Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import mixture_agents_models as mam
 
@@ -204,7 +204,7 @@ def test_utility_functions():
 def test_plotting_functions(data, model, fitted_agents):
     """Test plotting functions without actually displaying plots."""
     print("\n=== Testing Plotting Functions ===")
-    
+
     try:
         import matplotlib
         matplotlib.use('Agg')  # Use non-interactive backend
@@ -275,16 +275,17 @@ def main():
         # Test plotting
         test_plotting_functions(data, model, fitted_agents)
         
-        print("\n" + "=" * 60)
-        print("✓ All tests completed successfully!")
-        print("\nThe package is ready for production use.")
-        print("All major functionality has been implemented and verified.")
         
     except Exception as e:
         print(f"\n✗ Test suite failed with error: {e}")
         import traceback
         traceback.print_exc()
 
+    else:
+        print("\n" + "=" * 60)
+        print("✓ All tests completed successfully!")
+        print("\nThe package is ready for production use.")
+        print("All major functionality has been implemented and verified.")
 
 if __name__ == "__main__":
     main()
