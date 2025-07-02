@@ -167,7 +167,11 @@ class AgentOptions:
             self._process_fit_specification()
 
     def _process_fit_specification(self) -> None:
-        """Process fit symbols and parameters to create index mappings."""
+        """Process fit symbols and parameters to create index mappings.
+        
+        Supports complex parameter sharing patterns from Julia implementation
+        where multiple agents can share the same parameter (e.g., [1,1,2,2,0]).
+        """
         if self.fit_symbols is None or self.fit_params is None:
             return
 
@@ -178,36 +182,55 @@ class AgentOptions:
         self.fit_scales = []
         self.fit_priors = []
 
-        for i, (symbol, param_idx) in enumerate(zip(self.fit_symbols, self.fit_params)):
+        # Track which agents correspond to each parameter index
+        param_to_agents = {}
+        
+        for agent_idx, param_idx in enumerate(self.fit_params):
             if param_idx > 0:  # 0 means don't fit this parameter
-                agent_idx = param_idx - 1  # Convert to 0-indexed
-                if agent_idx < len(self.agents):
-                    agent = self.agents[agent_idx]
-                    if hasattr(agent, symbol):
-                        self.symbol_indices.append(i)
-                        self.param_indices.append(agent_idx)
-                        self.fit_indices.append(agent_idx)
+                if param_idx not in param_to_agents:
+                    param_to_agents[param_idx] = []
+                param_to_agents[param_idx].append(agent_idx)
 
-                        # Get scale information
-                        scale_attr = f"{symbol}_scale"
-                        scale = (
-                            getattr(agent, scale_attr, 0)
-                            if hasattr(agent, scale_attr)
-                            else 0
-                        )
-                        self.fit_scales.append(scale)
+        # Process each unique parameter
+        for param_idx in sorted(param_to_agents.keys()):
+            if param_idx <= len(self.fit_symbols):
+                symbol = self.fit_symbols[param_idx - 1]  # Convert to 0-indexed
+                
+                # Use first agent for extracting scale/prior info
+                first_agent_idx = param_to_agents[param_idx][0]
+                agent = self.agents[first_agent_idx]
+                
+                if hasattr(agent, symbol):
+                    self.symbol_indices.append(param_idx - 1)  # Symbol index
+                    self.param_indices.extend(param_to_agents[param_idx])  # All agent indices for this param
+                    
+                    # Get scale information
+                    scale_attr = f"{symbol}_scale"
+                    scale = (
+                        getattr(agent, scale_attr, 0)
+                        if hasattr(agent, scale_attr)
+                        else 0
+                    )
+                    self.fit_scales.append(scale)
 
-                        # Get prior information
-                        prior_attr = f"{symbol}_prior"
-                        prior = (
-                            getattr(agent, prior_attr, None)
-                            if hasattr(agent, prior_attr)
-                            else None
-                        )
-                        self.fit_priors.append(prior)
+                    # Get prior information
+                    prior_attr = f"{symbol}_prior"
+                    prior = (
+                        getattr(agent, prior_attr, None)
+                        if hasattr(agent, prior_attr)
+                        else None
+                    )
+                    self.fit_priors.append(prior)
 
-        # Remove duplicates from fit_indices
-        self.fit_indices = list(set(self.fit_indices))
+        # Store agents that have parameters being fit
+        self.fit_indices = [i for i, p in enumerate(self.fit_params) if p > 0]
+        
+        # Store parameter sharing mapping for complex patterns
+        self._param_to_agents = param_to_agents
+        
+    def get_shared_params(self) -> dict[int, list[int]]:
+        """Get mapping of parameter indices to agent indices that share them."""
+        return getattr(self, '_param_to_agents', {})
 
 
 def initialize_y(data: GenericData) -> np.ndarray:

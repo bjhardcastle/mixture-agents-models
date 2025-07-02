@@ -6,6 +6,7 @@ mixture-of-agents frameworks with hidden Markov model transitions.
 """
 
 from mixture_agents_models.agents import Agent, Bias, ContextRL, MBReward, MFReward, Perseveration
+from mixture_agents_models.analysis import agents_comparison, n_states_comparison
 from mixture_agents_models.integration import (
     convert_from_dynamic_routing,
     create_dynamic_routing_agents,
@@ -66,8 +67,10 @@ __all__ = [
     "create_dynamic_routing_agents",
     # Analysis functions
     "cross_validate",
-    "parameter_recovery",
+    "parameter_recovery", 
     "model_compare",
+    "agents_comparison",
+    "n_states_comparison",
     # Utility functions
     "smooth",
     "onehot",
