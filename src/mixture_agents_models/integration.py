@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from DynamicRoutingTask.Analysis.DynamicRoutingAnalysisUtils import DynRoutData
 
 from .agents import Agent, Bias, ContextRL, MFReward, Perseveration
 from .models import AgentOptions, ModelHMM, ModelOptionsHMM, optimize
@@ -22,12 +23,12 @@ from .tasks import DynamicRoutingData
 logger = logging.getLogger(__name__)
 
 
-def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
+def convert_from_dynamic_routing(session_data: DynRoutData) -> DynamicRoutingData:
     """
     Convert dynamic routing session data to mixture agents format.
 
     Args:
-        session_data: DynRoutObj
+        session_data: DynRoutData
 
     Returns:
         DynamicRoutingData object for mixture agents analysis
