@@ -27,36 +27,36 @@ def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
     Convert dynamic routing session data to mixture agents format.
 
     Args:
-        session_data: Session data object from RLmodelHPC.py
+        session_data: DynRoutObj
 
     Returns:
         DynamicRoutingData object for mixture agents analysis
     """
     # Extract core behavioral data
-    choices = np.array(session_data.trial_response, dtype=int)
+    choices = np.array(session_data.trialResponse, dtype=int)
 
     # Compute rewards based on choice and rewarded stimulus
     rewards = np.zeros_like(choices, dtype=float)
     for t in range(len(choices)):
-        if hasattr(session_data, "auto_reward_scheduled"):
-            if session_data.auto_reward_scheduled[t]:
+        if hasattr(session_data, "autoRewardScheduled"):
+            if session_data.autoRewardScheduled[t]:
                 rewards[t] = 1.0
 
         # Check if choice matches rewarded stimulus
         if (
             choices[t] == 1
-            and hasattr(session_data, "rewarded_stim")
-            and hasattr(session_data, "trial_stim")
+            and hasattr(session_data, "rewardedStim")
+            and hasattr(session_data, "trialStim")
         ):
-            stim = session_data.trial_stim[t]
-            if stim == session_data.rewarded_stim[t]:
+            stim = session_data.trialStim[t]
+            if stim == session_data.rewardedStim[t]:
                 rewards[t] = 1.0
 
     # Extract trial context information
     contexts = np.zeros(len(choices), dtype=int)
-    if hasattr(session_data, "trial_stim"):
+    if hasattr(session_data, "trialStim"):
         # Convert stimulus names to context indices
-        for t, stim in enumerate(session_data.trial_stim):
+        for t, stim in enumerate(session_data.trialStim):
             if "vis" in str(stim):
                 contexts[t] = 0  # Visual context
             elif "sound" in str(stim):
@@ -64,33 +64,33 @@ def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
 
     # Extract other trial information
     trial_stim = (
-        np.array(session_data.trial_stim)
-        if hasattr(session_data, "trial_stim")
+        np.array(session_data.trialStim)
+        if hasattr(session_data, "trialStim")
         else np.array([])
     )
     trial_block = (
-        np.array(session_data.trial_block)
-        if hasattr(session_data, "trial_block")
+        np.array(session_data.trialBlock)
+        if hasattr(session_data, "trialBlock")
         else np.array([])
     )
     trial_opto_label = (
-        np.array(session_data.trial_opto_label)
-        if hasattr(session_data, "trial_opto_label")
+        np.array(session_data.trialOptoLabel)
+        if hasattr(session_data, "trialOptoLabel")
         else np.array([])
     )
     auto_reward_scheduled = (
-        np.array(session_data.auto_reward_scheduled)
-        if hasattr(session_data, "auto_reward_scheduled")
+        np.array(session_data.autoRewardScheduled)
+        if hasattr(session_data, "autoRewardScheduled")
         else np.array([])
     )
     rewarded_stim = (
-        np.array(session_data.rewarded_stim)
-        if hasattr(session_data, "rewarded_stim")
+        np.array(session_data.rewardedStim)
+        if hasattr(session_data, "rewardedStim")
         else np.array([])
     )
     stim_start_times = (
-        np.array(session_data.stim_start_times)
-        if hasattr(session_data, "stim_start_times")
+        np.array(session_data.stimStartTimes)
+        if hasattr(session_data, "stimStartTimes")
         else np.array([])
     )
 
@@ -106,8 +106,8 @@ def convert_from_dynamic_routing(session_data: Any) -> DynamicRoutingData:
         auto_reward_scheduled=auto_reward_scheduled,
         rewarded_stim=rewarded_stim,
         stim_start_times=stim_start_times,
-        mouse_id=getattr(session_data, "subject_name", None),
-        session_start_time=getattr(session_data, "start_time", None),
+        mouse_id=getattr(session_data, "subjectName", None),
+        session_start_time=getattr(session_data, "startTime", None),
         metadata={"source": "dynamic_routing", "converted": True},
     )
 
